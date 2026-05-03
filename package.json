@@ -1,0 +1,22 @@
+{
+  "name": "gnomoagent",
+  "version": "1.0.0",
+  "description": "Mini agent framework with pluggable providers and JSON-Schema tools.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "example": "node examples/basic.js",
+    "test": "node --test 'test/**/*.test.js'"
+  },
+  "keywords": [
+    "agent",
+    "llm",
+    "openai",
+    "tools"
+  ],
+  "author": "",
+  "license": "ISC"
+}
