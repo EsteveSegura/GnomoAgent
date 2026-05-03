@@ -29,7 +29,8 @@ export class OpenAIProvider extends Provider {
       body.tools = tools.map((t) => ({ type: 'function', function: t.toProviderSchema() }));
     }
 
-    const res = await this.fetchImpl(`${this.baseURL}/chat/completions`, {
+    const fetchImpl = this.fetchImpl;
+    const res = await fetchImpl(`${this.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
