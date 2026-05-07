@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Agent } from '../src/Agent.js';
-import { Tool } from '../src/Tool.js';
-import { Provider } from '../src/providers/Provider.js';
-import { MaxIterationsError } from '../src/errors.js';
+import { Agent } from '../../src/Agent.js';
+import { Tool } from '../../src/Tool.js';
+import { Provider } from '../../src/providers/Provider.js';
+import { MaxIterationsError } from '../../src/errors/index.js';
 
 class ScriptedProvider extends Provider {
   constructor(steps) {

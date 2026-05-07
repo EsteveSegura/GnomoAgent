@@ -7,4 +7,4 @@ export {
   ToolError,
   MaxIterationsError,
   ProviderError,
-} from './errors.js';
+} from './errors/index.js';

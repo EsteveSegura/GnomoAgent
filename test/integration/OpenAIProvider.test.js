@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OpenAIProvider } from '../src/providers/OpenAIProvider.js';
-import { Tool } from '../src/Tool.js';
-import { ProviderError } from '../src/errors.js';
+import { OpenAIProvider } from '../../src/providers/OpenAIProvider.js';
+import { Tool } from '../../src/Tool.js';
+import { ProviderError } from '../../src/errors/index.js';
 
 const fakeResponse = (body, { ok = true, status = 200 } = {}) => ({
   ok,

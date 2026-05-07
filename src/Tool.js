@@ -1,5 +1,37 @@
-import { validate } from './validate.js';
-import { ToolError, ValidationError } from './errors.js';
+import { validate } from './validate/index.js';
+import { ToolError, ValidationError } from './errors/index.js';
+
+const PHASE_LABEL = {
+  input: 'Invalid input for tool',
+  output: 'Invalid output from tool',
+};
+
+function wrapValidate(value, schema, toolName, phase) {
+  try {
+    validate(value, schema);
+  } catch (err) {
+    if (err instanceof ValidationError) {
+      throw new ToolError(`${PHASE_LABEL[phase]} "${toolName}": ${err.message}`, {
+        toolName,
+        phase,
+        cause: err,
+      });
+    }
+    throw err;
+  }
+}
+
+async function runHandler(handler, input, toolName) {
+  try {
+    return await handler(input);
+  } catch (err) {
+    throw new ToolError(`Tool "${toolName}" handler threw: ${err.message}`, {
+      toolName,
+      phase: 'handler',
+      cause: err,
+    });
+  }
+}
 
 export class Tool {
   constructor({ name, description, inputSchema, outputSchema, handler }) {
@@ -25,45 +57,9 @@ export class Tool {
   }
 
   async call(input) {
-    try {
-      validate(input, this.inputSchema);
-    } catch (err) {
-      if (err instanceof ValidationError) {
-        throw new ToolError(`Invalid input for tool "${this.name}": ${err.message}`, {
-          toolName: this.name,
-          phase: 'input',
-          cause: err,
-        });
-      }
-      throw err;
-    }
-
-    let output;
-    try {
-      output = await this.handler(input);
-    } catch (err) {
-      throw new ToolError(`Tool "${this.name}" handler threw: ${err.message}`, {
-        toolName: this.name,
-        phase: 'handler',
-        cause: err,
-      });
-    }
-
-    if (this.outputSchema) {
-      try {
-        validate(output, this.outputSchema);
-      } catch (err) {
-        if (err instanceof ValidationError) {
-          throw new ToolError(`Invalid output from tool "${this.name}": ${err.message}`, {
-            toolName: this.name,
-            phase: 'output',
-            cause: err,
-          });
-        }
-        throw err;
-      }
-    }
-
+    wrapValidate(input, this.inputSchema, this.name, 'input');
+    const output = await runHandler(this.handler, input, this.name);
+    if (this.outputSchema) wrapValidate(output, this.outputSchema, this.name, 'output');
     return output;
   }
 }

@@ -1,4 +1,38 @@
-import { MaxIterationsError, ToolError } from './errors.js';
+import { MaxIterationsError, ToolError } from './errors/index.js';
+
+function buildInitialMessages(systemPrompt, userMessage) {
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  messages.push({ role: 'user', content: userMessage });
+  return messages;
+}
+
+function toOpenAIToolCalls(toolCalls) {
+  return toolCalls.map((tc) => ({
+    id: tc.id,
+    type: 'function',
+    function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+  }));
+}
+
+function assistantMessageFromResponse({ content, toolCalls, assistantMessage }) {
+  if (assistantMessage) return assistantMessage;
+  const message = { role: 'assistant', content };
+  if (toolCalls.length > 0) message.tool_calls = toOpenAIToolCalls(toolCalls);
+  return message;
+}
+
+function formatToolOutput(output) {
+  return typeof output === 'string' ? output : JSON.stringify(output);
+}
+
+function errorPayload(message) {
+  return JSON.stringify({ error: message });
+}
+
+function toolResultMessage(callId, content) {
+  return { role: 'tool', tool_call_id: callId, content };
+}
 
 export class Agent {
   constructor({ provider, systemPrompt = '', tools = [], maxIterations = 10 }) {
@@ -10,30 +44,30 @@ export class Agent {
     this.maxIterations = maxIterations;
   }
 
+  async _executeToolCall(call) {
+    const tool = this.toolsByName.get(call.name);
+    if (!tool) {
+      return toolResultMessage(call.id, errorPayload(`Unknown tool: ${call.name}`));
+    }
+    try {
+      const output = await tool.call(call.args);
+      return toolResultMessage(call.id, formatToolOutput(output));
+    } catch (err) {
+      if (err instanceof ToolError) {
+        return toolResultMessage(call.id, errorPayload(err.message));
+      }
+      throw err;
+    }
+  }
+
   async run(userMessage, { onStep } = {}) {
-    const messages = [];
-    if (this.systemPrompt) messages.push({ role: 'system', content: this.systemPrompt });
-    messages.push({ role: 'user', content: userMessage });
+    const messages = buildInitialMessages(this.systemPrompt, userMessage);
 
     for (let iteration = 1; iteration <= this.maxIterations; iteration++) {
-      const { content, toolCalls, assistantMessage } = await this.provider.chat({
-        messages,
-        tools: this.tools,
-      });
+      const response = await this.provider.chat({ messages, tools: this.tools });
+      const { content, toolCalls } = response;
 
-      messages.push(
-        assistantMessage ?? {
-          role: 'assistant',
-          content,
-          ...(toolCalls.length > 0 && {
-            tool_calls: toolCalls.map((tc) => ({
-              id: tc.id,
-              type: 'function',
-              function: { name: tc.name, arguments: JSON.stringify(tc.args) },
-            })),
-          }),
-        },
-      );
+      messages.push(assistantMessageFromResponse(response));
 
       if (onStep) await onStep({ iteration, content, toolCalls });
 
@@ -42,27 +76,7 @@ export class Agent {
       }
 
       for (const call of toolCalls) {
-        const tool = this.toolsByName.get(call.name);
-        let resultContent;
-        if (!tool) {
-          resultContent = JSON.stringify({ error: `Unknown tool: ${call.name}` });
-        } else {
-          try {
-            const output = await tool.call(call.args);
-            resultContent = typeof output === 'string' ? output : JSON.stringify(output);
-          } catch (err) {
-            if (err instanceof ToolError) {
-              resultContent = JSON.stringify({ error: err.message });
-            } else {
-              throw err;
-            }
-          }
-        }
-        messages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          content: resultContent,
-        });
+        messages.push(await this._executeToolCall(call));
       }
     }
 

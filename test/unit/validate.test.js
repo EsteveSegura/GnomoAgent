@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validate } from '../src/validate.js';
-import { ValidationError } from '../src/errors.js';
+import { validate } from '../../src/validate/index.js';
+import { ValidationError } from '../../src/errors/index.js';
 
 test('validate: passes when types match', () => {
   validate({ name: 'a', age: 3 }, {

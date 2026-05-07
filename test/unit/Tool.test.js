@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Tool } from '../src/Tool.js';
-import { ToolError } from '../src/errors.js';
+import { Tool } from '../../src/Tool.js';
+import { ToolError } from '../../src/errors/index.js';
 
 const addSchema = {
   input: {
