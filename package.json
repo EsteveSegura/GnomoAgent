@@ -11,8 +11,8 @@
     "example": "node examples/basic.js",
     "example:conversation": "node examples/conversation.js",
     "example:geometry": "node examples/geometry.js",
-    "test": "node --test 'test/unit/**/*.test.js' 'test/integration/**/*.test.js'",
-    "test:e2e": "node --test 'test/e2e/**/*.test.js'"
+    "test": "node --test test/unit/*.test.js test/integration/*.test.js",
+    "test:e2e": "node --test test/e2e/*.test.js"
   },
   "keywords": [
     "agent",
