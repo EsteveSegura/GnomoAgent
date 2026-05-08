@@ -112,6 +112,42 @@ test('OpenAIProvider: throws ProviderError on malformed tool call arguments', as
   await assert.rejects(provider.chat({ messages: [] }), ProviderError);
 });
 
+test('OpenAIProvider: translates canonical assistant+tool history to OpenAI wire format', async () => {
+  let captured;
+  const fetchImpl = async (url, init) => {
+    captured = JSON.parse(init.body);
+    return fakeResponse({ choices: [{ message: { content: 'ok' } }] });
+  };
+  const provider = new OpenAIProvider({ apiKey: 'sk', fetchImpl });
+  await provider.chat({
+    messages: [
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: 'hi' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'c1', name: 'add', args: { a: 1, b: 2 } }],
+      },
+      { role: 'tool', toolCallId: 'c1', name: 'add', content: '{"sum":3}' },
+    ],
+  });
+
+  assert.equal(captured.messages.length, 4);
+  // assistant: canonical toolCalls -> OpenAI tool_calls with stringified arguments
+  const assistantMsg = captured.messages[2];
+  assert.equal(assistantMsg.role, 'assistant');
+  assert.equal(assistantMsg.tool_calls[0].id, 'c1');
+  assert.equal(assistantMsg.tool_calls[0].type, 'function');
+  assert.equal(assistantMsg.tool_calls[0].function.name, 'add');
+  assert.equal(assistantMsg.tool_calls[0].function.arguments, '{"a":1,"b":2}');
+  // tool: canonical toolCallId -> OpenAI tool_call_id
+  const toolMsg = captured.messages[3];
+  assert.equal(toolMsg.role, 'tool');
+  assert.equal(toolMsg.tool_call_id, 'c1');
+  assert.equal(toolMsg.content, '{"sum":3}');
+  assert.ok(!('toolCallId' in toolMsg), 'canonical key must not leak to wire');
+});
+
 test('OpenAIProvider: respects extraBody and custom baseURL', async () => {
   let captured;
   const fetchImpl = async (url, init) => {

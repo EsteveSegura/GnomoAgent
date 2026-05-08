@@ -77,27 +77,15 @@ class ScriptedLLM extends Provider {
   async chat({ messages }) {
     if (this.steps.length === 0) throw new Error('ScriptedLLM script exhausted');
     const next = this.steps.shift()(messages);
-    const toolCalls = next.toolCalls ?? [];
     return {
       content: next.content ?? '',
-      toolCalls,
-      assistantMessage: {
-        role: 'assistant',
-        content: next.content ?? '',
-        ...(toolCalls.length > 0 && {
-          tool_calls: toolCalls.map((tc) => ({
-            id: tc.id,
-            type: 'function',
-            function: { name: tc.name, arguments: JSON.stringify(tc.args) },
-          })),
-        }),
-      },
+      toolCalls: next.toolCalls ?? [],
     };
   }
 }
 
 const findToolResult = (messages, callId) => {
-  const m = messages.find((x) => x.role === 'tool' && x.tool_call_id === callId);
+  const m = messages.find((x) => x.role === 'tool' && x.toolCallId === callId);
   if (!m) throw new Error(`No tool result found for ${callId}`);
   return JSON.parse(m.content);
 };
@@ -107,14 +95,8 @@ const finalStep = (text) => ({ content: text });
 
 function getAssistantToolCalls(messages) {
   return messages
-    .filter((m) => m.role === 'assistant' && Array.isArray(m.tool_calls))
-    .flatMap((m) =>
-      m.tool_calls.map((tc) => ({
-        id: tc.id,
-        name: tc.function.name,
-        args: JSON.parse(tc.function.arguments),
-      })),
-    );
+    .filter((m) => m.role === 'assistant' && Array.isArray(m.toolCalls))
+    .flatMap((m) => m.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args })));
 }
 
 // ---------------------------------------------------------------------------

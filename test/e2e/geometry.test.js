@@ -61,14 +61,8 @@ function makeTools() {
 
 function getAssistantToolCalls(messages) {
   return messages
-    .filter((m) => m.role === 'assistant' && Array.isArray(m.tool_calls))
-    .flatMap((m) =>
-      m.tool_calls.map((tc) => ({
-        id: tc.id,
-        name: tc.function.name,
-        args: JSON.parse(tc.function.arguments),
-      })),
-    );
+    .filter((m) => m.role === 'assistant' && Array.isArray(m.toolCalls))
+    .flatMap((m) => m.toolCalls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args })));
 }
 
 // ---------------------------------------------------------------------------

@@ -15,21 +15,9 @@ class ScriptedProvider extends Provider {
     this.calls.push({ messages: structuredClone(messages), tools });
     const step = this.steps.shift();
     if (!step) throw new Error('Provider script exhausted');
-    const toolCalls = step.toolCalls ?? [];
     return {
       content: step.content ?? '',
-      toolCalls,
-      assistantMessage: {
-        role: 'assistant',
-        content: step.content ?? '',
-        ...(toolCalls.length > 0 && {
-          tool_calls: toolCalls.map((tc) => ({
-            id: tc.id,
-            type: 'function',
-            function: { name: tc.name, arguments: JSON.stringify(tc.args) },
-          })),
-        }),
-      },
+      toolCalls: step.toolCalls ?? [],
     };
   }
 }
@@ -71,8 +59,23 @@ test('Agent: runs tool then finalizes', async () => {
   assert.equal(r.iterations, 2);
   assert.equal(r.finalMessage, 'sum is 5');
   const toolMsg = r.messages.find((m) => m.role === 'tool');
-  assert.equal(toolMsg.tool_call_id, 'c1');
+  assert.equal(toolMsg.toolCallId, 'c1');
+  assert.equal(toolMsg.name, 'add');
   assert.deepEqual(JSON.parse(toolMsg.content), { sum: 5 });
+});
+
+test('Agent: assistant message in history holds canonical toolCalls', async () => {
+  const provider = new ScriptedProvider([
+    { toolCalls: [{ id: 'c1', name: 'add', args: { a: 1, b: 2 } }] },
+    { content: 'done' },
+  ]);
+  const agent = new Agent({ provider, tools: [addTool()] });
+  const r = await agent.run('go');
+  const assistantMsg = r.messages.find((m) => m.role === 'assistant' && m.toolCalls);
+  assert.ok(assistantMsg);
+  assert.equal(assistantMsg.toolCalls[0].name, 'add');
+  assert.deepEqual(assistantMsg.toolCalls[0].args, { a: 1, b: 2 });
+  assert.ok(!('tool_calls' in assistantMsg), 'no OpenAI-shaped tool_calls leak in canonical history');
 });
 
 test('Agent: skips system message when systemPrompt is empty', async () => {

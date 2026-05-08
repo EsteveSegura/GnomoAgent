@@ -1,5 +1,6 @@
 import { Provider } from './Provider.js';
 import { ProviderError } from '../errors/index.js';
+import { ROLE, TOOL_TYPE } from '../constants.js';
 
 const CHAT_COMPLETIONS_PATH = '/chat/completions';
 
@@ -10,10 +11,32 @@ function buildAuthHeaders(apiKey) {
   };
 }
 
+function canonicalToOpenAIMessage(msg) {
+  if (msg.role === ROLE.ASSISTANT) {
+    const out = { role: ROLE.ASSISTANT, content: msg.content ?? '' };
+    if (msg.toolCalls?.length) {
+      out.tool_calls = msg.toolCalls.map((tc) => ({
+        id: tc.id,
+        type: TOOL_TYPE.FUNCTION,
+        function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+      }));
+    }
+    return out;
+  }
+  if (msg.role === ROLE.TOOL) {
+    return { role: ROLE.TOOL, tool_call_id: msg.toolCallId, content: msg.content };
+  }
+  return { role: msg.role, content: msg.content };
+}
+
 function buildRequestBody({ model, messages, tools, extraBody }) {
-  const body = { model, messages, ...extraBody };
+  const body = {
+    model,
+    messages: messages.map(canonicalToOpenAIMessage),
+    ...extraBody,
+  };
   if (tools.length > 0) {
-    body.tools = tools.map((t) => ({ type: 'function', function: t.toProviderSchema() }));
+    body.tools = tools.map((t) => ({ type: TOOL_TYPE.FUNCTION, function: t.toFunctionSchema() }));
   }
   return body;
 }
@@ -59,11 +82,24 @@ function parseToolCalls(rawToolCalls) {
     id: tc.id,
     name: tc.function?.name,
     args: parseToolCallArguments(tc.function?.name, tc.function?.arguments),
-    raw: tc,
   }));
 }
 
+/**
+ * Provider that talks to OpenAI's `/chat/completions` endpoint via `fetch`.
+ * Translates canonical messages to OpenAI's wire format on send and back on
+ * receive, so `Agent` never sees OpenAI-specific shapes.
+ */
 export class OpenAIProvider extends Provider {
+  /**
+   * @param {Object=} opts
+   * @param {string} opts.apiKey
+   * @param {string=} opts.model - Defaults to 'gpt-4o-mini'.
+   * @param {string=} opts.baseURL - Defaults to 'https://api.openai.com/v1'.
+   * @param {typeof fetch=} opts.fetchImpl - Override for testing or alt runtimes.
+   * @param {Object=} opts.extraBody - Extra fields merged into every request body
+   *   (e.g. `temperature`, `top_p`, `response_format`).
+   */
   constructor({
     apiKey,
     model = 'gpt-4o-mini',
@@ -97,7 +133,6 @@ export class OpenAIProvider extends Provider {
     return {
       content: message.content ?? '',
       toolCalls: parseToolCalls(message.tool_calls),
-      assistantMessage: message,
       raw: json,
     };
   }

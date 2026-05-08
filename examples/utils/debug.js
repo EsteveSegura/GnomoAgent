@@ -30,18 +30,22 @@ export function printMessage(msg, i) {
 
   if (msg.content) console.log(indent(msg.content));
 
-  if (msg.tool_calls?.length) {
-    for (const tc of msg.tool_calls) {
+  if (msg.toolCalls?.length) {
+    for (const tc of msg.toolCalls) {
       console.log(
         `${COLOR.dim}    ↳ tool_call${COLOR.reset} ` +
-          `${COLOR.bold}${tc.function.name}${COLOR.reset}` +
-          `${COLOR.dim}(${tc.function.arguments})  id=${tc.id}${COLOR.reset}`,
+          `${COLOR.bold}${tc.name}${COLOR.reset}` +
+          `${COLOR.dim}(${JSON.stringify(tc.args)})  id=${tc.id}${COLOR.reset}`,
       );
     }
   }
 
   if (msg.role === 'tool') {
-    console.log(`${COLOR.dim}    tool_call_id=${msg.tool_call_id}${COLOR.reset}`);
+    console.log(
+      `${COLOR.dim}    toolCallId=${msg.toolCallId}` +
+        (msg.name ? ` name=${msg.name}` : '') +
+        `${COLOR.reset}`,
+    );
   }
 }
 

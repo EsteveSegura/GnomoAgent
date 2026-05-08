@@ -17,14 +17,14 @@ test('Tool: requires name and handler', () => {
   assert.throws(() => new Tool({ name: 'x' }), TypeError);
 });
 
-test('Tool: toProviderSchema shape', () => {
+test('Tool: toFunctionSchema shape', () => {
   const t = new Tool({
     name: 'add',
     description: 'add',
     inputSchema: addSchema.input,
     handler: async ({ a, b }) => ({ sum: a + b }),
   });
-  assert.deepEqual(t.toProviderSchema(), {
+  assert.deepEqual(t.toFunctionSchema(), {
     name: 'add',
     description: 'add',
     parameters: addSchema.input,
